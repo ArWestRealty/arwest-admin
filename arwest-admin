@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="hy">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARWEST REALTY — Admin</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      color: #111;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    .card {
+      background: white;
+      padding: 22px;
+      border-radius: 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 3px 15px rgba(0,0,0,.08);
+    }
+
+    h1, h2 {
+      margin-top: 0;
+    }
+
+    input,
+    textarea,
+    button {
+      width: 100%;
+      padding: 13px;
+      margin-top: 8px;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      font-size: 16px;
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+    }
+
+    button {
+      border: none;
+      background: #111;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #e8e8e8;
+      color: #111;
+    }
+
+    button.delete {
+      background: #b42318;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .property {
+      border: 1px solid #e5e5e5;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+
+    .property-title {
+      font-size: 18px;
+      font-weight: bold;
+    }
+
+    .muted {
+      color: #777;
+    }
+
+    .error {
+      color: #b42318;
+      margin-top: 10px;
+    }
+
+    .success {
+      color: #16803c;
+      margin-top: 10px;
+    }
+
+    #admin {
+      display: none;
+    }
+
+    @media (max-width: 650px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <!-- LOGIN -->
+  <div id="loginPage" class="card">
+
+    <h1>ARWEST REALTY</h1>
+    <h2>Admin մուտք</h2>
+
+    <form id="loginForm">
+
+      <input
+        id="email"
+        type="email"
+        placeholder="Email"
+        autocomplete="username"
+        required
+      >
+
+      <input
+        id="password"
+        type="password"
+        placeholder="Password"
+        autocomplete="current-password"
+        required
+      >
+
+      <button type="submit">
+        Մուտք գործել
+      </button>
+
+    </form>
+
+    <div id="loginMessage"></div>
+
+  </div>
+
+
+  <!-- ADMIN -->
+  <div id="admin">
+
+    <div class="card">
+
+      <h1>ARWEST REALTY — Admin</h1>
+
+      <button
+        id="logoutButton"
+        class="secondary"
+      >
+        Դուրս գալ
+      </button>
+
+    </div>
+
+
+    <!-- ADD / EDIT -->
+    <div class="card">
+
+      <h2 id="formTitle">
+        Ավելացնել գույք
+      </h2>
+
+      <form id="propertyForm">
+
+        <div class="grid">
+
+          <input
+            id="code"
+            placeholder="Կոդ"
+          >
+
+          <input
+            id="type"
+            placeholder="Տեսակ"
+          >
+
+          <input
+            id="title"
+            placeholder="Վերնագիր"
+          >
+
+          <input
+            id="price"
+            type="number"
+            placeholder="Գին ($)"
+          >
+
+          <input
+            id="area"
+            type="number"
+            placeholder="Մակերես (քմ)"
+          >
+
+          <input
+            id="rooms"
+            type="number"
+            placeholder="Սենյակներ"
+          >
+
+          <input
+            id="floor"
+            type="number"
+            placeholder="Հարկ"
+          >
+
+          <input
+            id="phone"
+            placeholder="Հեռախոս"
+          >
+
+        </div>
+
+        <textarea
+          id="description"
+          placeholder="Նկարագրություն"
+        ></textarea>
+
+        <button type="submit">
+          Պահպանել
+        </button>
+
+        <button
+          type="button"
+          id="clearButton"
+          class="secondary"
+        >
+          Մաքրել
+        </button>
+
+      </form>
+
+      <div id="saveMessage"></div>
+
+    </div>
+
+
+    <!-- SEARCH -->
+    <div class="card">
+
+      <h2>Գույքեր</h2>
+
+      <input
+        id="search"
+        placeholder="Փնտրել կոդով, հասցեով, հեռախոսով..."
+      >
+
+      <div id="propertyList"></div>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<script>
+
+  const SUPABASE_URL =
+    "https://olcrnqxqiobqffkqeevo.supabase.co";
+
+  const SUPABASE_KEY =
+    "sb_publishable_jJsBLbOFUjjNzXUtXsbpgg_SiBMkYHN";
+
+  const supabaseClient =
+    window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_KEY
+    );
+
+
+  let properties = [];
+
+  let editingId = null;
+
+
+  const loginPage =
+    document.getElementById("loginPage");
+
+  const admin =
+    document.getElementById("admin");
+
+  const loginForm =
+    document.getElementById("loginForm");
+
+  const loginMessage =
+    document.getElementById("loginMessage");
+
+
+  /*
+   LOGIN
+  */
+
+  loginForm.addEventListener(
+    "submit",
+    async function(event) {
+
+      event.preventDefault();
+
+      loginMessage.className = "";
+      loginMessage.textContent =
+        "Մուտք է կատարվում...";
+
+      const email =
+        document
+          .getElementById("email")
+          .value
+          .trim();
+
+      const password =
+        document
+          .getElementById("password")
+          .value;
+
+      try {
+
+        const result =
+          await supabaseClient.auth.signInWithPassword({
+            email: email,
+            password: password
+          });
+
+        if (result.error) {
+
+          loginMessage.className = "error";
+
+          loginMessage.textContent =
+            "Մուտքը չստացվեց։ " +
+            result.error.message;
+
+          return;
+        }
+
+        if (result.data.session) {
+
+          showAdmin();
+
+        } else {
+
+          loginMessage.className = "error";
+
+          loginMessage.textContent =
+            "Մուտքը չհաջողվեց։";
+
+        }
+
+      } catch (error) {
+
+        loginMessage.className = "error";
+
+        loginMessage.textContent =
+          "Սխալ՝ " + error.message;
+
+      }
+
+    }
+  );
+
+
+  /*
+   SHOW ADMIN
+  */
+
+  function showAdmin() {
+
+    loginPage.style.display = "none";
+
+    admin.style.display = "block";
+
+    loadProperties();
+
+  }
+
+
+  /*
+   SHOW LOGIN
+  */
+
+  function showLogin() {
+
+    loginPage.style.display = "block";
+
+    admin.style.display = "none";
+
+  }
+
+
+  /*
+   LOGOUT
+  */
+
+  document
+    .getElementById("logoutButton")
+    .addEventListener(
+      "click",
+      async function() {
+
+        await supabaseClient.auth.signOut();
+
+        showLogin();
+
+      }
+    );
+
+
+  /*
+   CHECK SESSION
+  */
+
+  async function checkSession() {
+
+    const result =
+      await supabaseClient.auth.getSession();
+
+    if (result.data.session) {
+
+      showAdmin();
+
+    } else {
+
+      showLogin();
+
+    }
+
+  }
+
+
+  /*
+   LOAD PROPERTIES
+  */
+
+  async function loadProperties() {
+
+    const result =
+      await supabaseClient
+        .from("properties")
+        .select("*")
+        .order("created_at", {
+          ascending: false
+        });
+
+    if (result.error) {
+
+      document.getElementById(
+        "propertyList"
+      ).innerHTML =
+        "<p class='error'>" +
+        result.error.message +
+        "</p>";
+
+      return;
+    }
+
+    properties =
+      result.data || [];
+
+    renderProperties();
+
+  }
+
+
+  /*
+   DISPLAY PROPERTIES
+  */
+
+  function renderProperties() {
+
+    const search =
+      document
+        .getElementById("search")
+        .value
+        .toLowerCase()
+        .trim();
+
+    const filtered =
+      properties.filter(function(property) {
+
+        return JSON.stringify(property)
+          .toLowerCase()
+          .includes(search);
+
+      });
+
+
+    const list =
+      document.getElementById(
+        "propertyList"
+      );
+
+
+    if (!filtered.length) {
+
+      list.innerHTML =
+        "<p class='muted'>Գույք չկա։</p>";
+
+      return;
+
+    }
+
+
+    list.innerHTML =
+      filtered.map(function(property) {
+
+        return `
+          <div class="property">
+
+            <div class="property-title">
+              ${escapeHtml(property.title || "Առանց վերնագրի")}
+            </div>
+
+            <p>
+              Կոդ՝
+              <b>${escapeHtml(property.code || "—")}</b>
+            </p>
+
+            <p>
+              ${escapeHtml(property.type || "—")}
+            </p>
+
+            <p>
+              <b>
+                $${Number(property.price || 0).toLocaleString()}
+              </b>
+              ·
+              ${escapeHtml(property.area || "—")} քմ
+              ·
+              ${escapeHtml(property.rooms || "—")} սենյակ
+              ·
+              ${escapeHtml(property.floor || "—")} հարկ
+            </p>
+
+            <p>
+              ${escapeHtml(property.description || "")}
+            </p>
+
+            <p>
+              Հեռ․
+              ${escapeHtml(property.phone || "—")}
+            </p>
+
+            <button
+              onclick="editProperty('${property.id}')"
+            >
+              Փոփոխել
+            </button>
+
+            <button
+              class="delete"
+              onclick="deleteProperty('${property.id}')"
+            >
+              Ջնջել
+            </button>
+
+          </div>
+        `;
+
+      }).join("");
+
+  }
+
+
+  /*
+   SEARCH
+  */
+
+  document
+    .getElementById("search")
+    .addEventListener(
+      "input",
+      renderProperties
+    );
+
+
+  /*
+   SAVE PROPERTY
+  */
+
+  document
+    .getElementById("propertyForm")
+    .addEventListener(
+      "submit",
+      async function(event) {
+
+        event.preventDefault();
+
+
+        const property = {
+
+          code:
+            document
+              .getElementById("code")
+              .value
+              .trim(),
+
+          type:
+            document
+              .getElementById("type")
+              .value
+              .trim(),
+
+          title:
+            document
+              .getElementById("title")
+              .value
+              .trim(),
+
+          price:
+            Number(
+              document
+                .getElementById("price")
+                .value
+            ) || 0,
+
+          area:
+            Number(
+              document
+                .getElementById("area")
+                .value
+            ) || 0,
+
+          rooms:
+            Number(
+              document
+                .getElementById("rooms")
+                .value
+            ) || 0,
+
+          floor:
+            Number(
+              document
+                .getElementById("floor")
+                .value
+            ) || 0,
+
+          phone:
+            document
+              .getElementById("phone")
+              .value
+              .trim(),
+
+          description:
+            document
+              .getElementById("description")
+              .value
+              .trim()
+
+        };
+
+
+        let result;
+
+
+        if (editingId) {
+
+          result =
+            await supabaseClient
+              .from("properties")
+              .update(property)
+              .eq("id", editingId);
+
+        } else {
+
+          result =
+            await supabaseClient
+              .from("properties")
+              .insert(property);
+
+        }
+
+
+        if (result.error) {
+
+          document.getElementById(
+            "saveMessage"
+          ).className = "error";
+
+          document.getElementById(
+            "saveMessage"
+          ).textContent =
+            result.error.message;
+
+          return;
+
+        }
+
+
+        document.getElementById(
+          "saveMessage"
+        ).className = "success";
+
+        document.getElementById(
+          "saveMessage"
+        ).textContent =
+          "Պահպանվեց ✓";
+
+
+        clearForm();
+
+        loadProperties();
+
+      }
+    );
+
+
+  /*
+   EDIT
+  */
+
+  window.editProperty =
+    function(id) {
+
+      const property =
+        properties.find(function(item) {
+
+          return String(item.id) === String(id);
+
+        });
+
+
+      if (!property) return;
+
+
+      editingId = id;
+
+
+      document.getElementById(
+        "formTitle"
+      ).textContent =
+        "Փոփոխել գույքը";
+
+
+      document.getElementById("code").value =
+        property.code || "";
+
+      document.getElementById("type").value =
+        property.type || "";
+
+      document.getElementById("title").value =
+        property.title || "";
+
+      document.getElementById("price").value =
+        property.price || "";
+
+      document.getElementById("area").value =
+        property.area || "";
+
+      document.getElementById("rooms").value =
+        property.rooms || "";
+
+      document.getElementById("floor").value =
+        property.floor || "";
+
+      document.getElementById("phone").value =
+        property.phone || "";
+
+      document.getElementById("description").value =
+        property.description || "";
+
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+
+    };
+
+
+  /*
+   DELETE
+  */
+
+  window.deleteProperty =
+    async function(id) {
+
+      if (
+        !confirm(
+          "Վստա՞հ ես, որ ուզում ես ջնջել այս գույքը։"
+        )
+      ) {
+
+        return;
+
+      }
+
+
+      const result =
+        await supabaseClient
+          .from("properties")
+          .delete()
+          .eq("id", id);
+
+
+      if (result.error) {
+
+        alert(result.error.message);
+
+        return;
+
+      }
+
+
+      loadProperties();
+
+    };
+
+
+  /*
+   CLEAR
+  */
+
+  function clearForm() {
+
+    editingId = null;
+
+
+    document.getElementById(
+      "formTitle"
+    ).textContent =
+      "Ավելացնել գույք";
+
+
+    [
+      "code",
+      "type",
+      "title",
+      "price",
+      "area",
+      "rooms",
+      "floor",
+      "phone",
+      "description"
+    ].forEach(function(id) {
+
+      document.getElementById(id).value = "";
+
+    });
+
+
+    document.getElementById(
+      "saveMessage"
+    ).textContent = "";
+
+  }
+
+
+  document
+    .getElementById("clearButton")
+    .addEventListener(
+      "click",
+      clearForm
+    );
+
+
+  /*
+   AUTH STATE
+  */
+
+  supabaseClient.auth.onAuthStateChange(
+    function(event, session) {
+
+      if (session) {
+
+        showAdmin();
+
+      } else {
+
+        showLogin();
+
+      }
+
+    }
+  );
+
+
+  /*
+   START
+  */
+
+  checkSession();
+
+
+  /*
+   SECURITY
+  */
+
+  function escapeHtml(value) {
+
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+
+  }
+
+</script>
+
+</body>
+</html>
