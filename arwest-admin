@@ -272,8 +272,7 @@
 
 <script>
 
-  const SUPABASE_URL =
-    "https://olcrnqxqiobqffkqeevo.supabase.co";
+  const SUPABASE_URL = "https://olcrnqxqiobqffkqeevo.supabase.co";
 
   const SUPABASE_KEY =
     "sb_publishable_jJsBLbOFUjjNzXUtXsbpgg_SiBMkYHN";
