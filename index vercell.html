@@ -15,76 +15,75 @@
   <div class="brand">ARWEST REALTY</div><p class="muted">Admin մուտք</p>
   <label>Email<input id="email" type="email" autocomplete="username"></label>
   <label>Password<input id="password" type="password" autocomplete="current-password"></label>
-  <button class="btn primary" onclick="login()">Մուտք գործել</button>
+  <button id="loginBtn" class="btn primary" type="button">Մուտք գործել</button>
   <div id="loginMsg"></div>
 </div>
-
 <div id="app" class="hidden">
-  <div class="card">
-    <div class="row" style="justify-content:space-between"><div><div class="brand">ARWEST REALTY</div><div class="muted">Անշարժ գույքի բազա</div></div><button class="btn light" onclick="logout()">Ելք</button></div>
-  </div>
-  <div class="card">
-    <h2>Ավելացնել / խմբագրել</h2>
-    <input id="editId" type="hidden">
-    <div class="grid">
-      <label>Կոդ<input id="code"></label>
-      <label>Տեսակ<input id="type" value="Բնակարան"></label>
-      <label>Վերնագիր<input id="title"></label>
-      <label>Գին ($)<input id="price" type="number"></label>
-      <label>Մակերես (քմ)<input id="area" type="number"></label>
-      <label>Սենյակներ<input id="rooms" type="number"></label>
-      <label>Հարկ<input id="floor" type="number"></label>
-      <label>Հեռախոս<input id="phone"></label>
-    </div>
-    <label>Նկարագրություն<textarea id="description" rows="5"></textarea></label>
-    <div class="row"><button class="btn primary" onclick="saveProperty()">Պահպանել</button><button class="btn light" onclick="clearForm()">Մաքրել</button></div>
-    <div id="formMsg"></div>
-  </div>
-  <div class="card">
-    <div class="row" style="justify-content:space-between"><h2 style="margin:0">Բազա</h2><input id="search" placeholder="Որոնել..." oninput="render()" style="max-width:300px"></div>
-    <div id="list"></div>
-  </div>
-</div>
-</div>
+  <div class="card"><div class="row" style="justify-content:space-between"><div><div class="brand">ARWEST REALTY</div><div class="muted">Անշարժ գույքի բազա</div></div><button class="btn light" type="button" id="logoutBtn">Ելք</button></div></div>
+  <div class="card"><h2>Ավելացնել / խմբագրել</h2><input id="editId" type="hidden"><div class="grid">
+  <label>Կոդ<input id="code"></label><label>Տեսակ<input id="type" value="Բնակարան"></label><label>Վերնագիր<input id="title"></label><label>Գին ($)<input id="price" type="number"></label><label>Մակերես (քմ)<input id="area" type="number"></label><label>Սենյակներ<input id="rooms" type="number"></label><label>Հարկ<input id="floor" type="number"></label><label>Հեռախոս<input id="phone"></label></div>
+  <label>Նկարագրություն<textarea id="description" rows="5"></textarea></label><div class="row"><button class="btn primary" type="button" id="saveBtn">Պահպանել</button><button class="btn light" type="button" id="clearBtn">Մաքրել</button></div><div id="formMsg"></div></div>
+  <div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Բազա</h2><input id="search" placeholder="Որոնել..." style="max-width:300px"></div><div id="list"></div></div>
+</div></div>
 <script>
-const SUPABASE_URL="https://olcrnqxqiobqffkqeevo.supabase.co";
-const SUPABASE_KEY="sb_publishable_jJsBLbOFUjjNzXUtXsbpgg_SiBMkYHN";
-const db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
-let properties=[];
+const SUPABASE_URL = 'https://olcrnqxqiobqffkqeevo.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_jJsBLbOFUjjNzXUtXsbpgg_SiBMkYHN';
+
+let client = null;
+let properties = [];
+
+function setMsg(id,text,type=''){const el=document.getElementById(id);el.className=type;el.textContent=text;}
+function showApp(){document.getElementById('loginBox').classList.add('hidden');document.getElementById('app').classList.remove('hidden');}
+function showLogin(){document.getElementById('app').classList.add('hidden');document.getElementById('loginBox').classList.remove('hidden');}
 
 async function login(){
- const msg=document.getElementById('loginMsg'); msg.className=''; msg.textContent='Մուտք...';
- const email=document.getElementById('email').value.trim(), password=document.getElementById('password').value;
- const {error}=await db.auth.signInWithPassword({email,password});
- if(error){msg.className='error';msg.textContent=error.message;return}
- msg.className='success';msg.textContent='Մուտքը հաջողվեց';showApp();await load();
+  const email=document.getElementById('email').value.trim();
+  const password=document.getElementById('password').value;
+  if(!client){setMsg('loginMsg','Supabase-ը չի բեռնվել։ Թարմացրու էջը։','error');return;}
+  if(!email||!password){setMsg('loginMsg','Մուտքագրիր email-ը և password-ը։','error');return;}
+  setMsg('loginMsg','Մուտք...');
+  const {error}=await client.auth.signInWithPassword({email,password});
+  if(error){setMsg('loginMsg',error.message,'error');return;}
+  setMsg('loginMsg','Մուտքը հաջողվեց։','success');
+  showApp();
+  await load();
 }
-async function logout(){await db.auth.signOut();document.getElementById('app').classList.add('hidden');document.getElementById('loginBox').classList.remove('hidden')}
-function showApp(){document.getElementById('loginBox').classList.add('hidden');document.getElementById('app').classList.remove('hidden')}
+async function logout(){if(client)await client.auth.signOut();showLogin();}
 async function load(){
- const {data,error}=await db.from('properties').select('*').order('created_at',{ascending:false});
- if(error){document.getElementById('list').innerHTML='<div class="error">'+escapeHtml(error.message)+'</div>';return}
- properties=data||[];render();
+  const {data,error}=await client.from('properties').select('*').order('created_at',{ascending:false});
+  if(error){document.getElementById('list').innerHTML='<div class="error">'+escapeHtml(error.message)+'</div>';return;}
+  properties=data||[];render();
 }
 function render(){
- const q=document.getElementById('search').value.toLowerCase();const list=document.getElementById('list');
- const rows=properties.filter(p=>JSON.stringify(p).toLowerCase().includes(q));
- list.innerHTML=rows.length?rows.map(p=>`<div class="property"><h3>${escapeHtml(p.title||'Առանց վերնագրի')}</h3><div>Կոդ՝ <b>${escapeHtml(p.code||'')}</b> · ${escapeHtml(p.type||'')}</div><div class="price">$${Number(p.price||0).toLocaleString()} · ${p.area||''} քմ · ${p.rooms||''} սենյակ · ${p.floor||''} հարկ</div><div>${escapeHtml(p.phone||'')}</div><p>${escapeHtml(p.description||'')}</p><div class="row"><button class="btn light" onclick="editProperty('${p.id}')">Խմբագրել</button><button class="btn danger" onclick="deleteProperty('${p.id}')">Ջնջել</button></div></div>`).join(''):'<div class="muted">Տվյալներ չկան</div>';
+  const q=document.getElementById('search').value.toLowerCase();
+  const rows=properties.filter(p=>JSON.stringify(p).toLowerCase().includes(q));
+  document.getElementById('list').innerHTML=rows.length?rows.map(p=>`<div class="property"><h3>${escapeHtml(p.title||'Առանց վերնագրի')}</h3><div>Կոդ՝ <b>${escapeHtml(p.code||'')}</b> · ${escapeHtml(p.type||'')}</div><div class="price">$${Number(p.price||0).toLocaleString()} · ${p.area||''} քմ · ${p.rooms||''} սենյակ · ${p.floor||''} հարկ</div><div>${escapeHtml(p.phone||'')}</div><p>${escapeHtml(p.description||'')}</p><div class="row"><button class="btn light" type="button" onclick="editProperty('${p.id}')">Խմբագրել</button><button class="btn danger" type="button" onclick="deleteProperty('${p.id}')">Ջնջել</button></div></div>`).join(''):'<div class="muted">Տվյալներ չկան</div>';
 }
-function editProperty(id){const p=properties.find(x=>String(x.id)===String(id));if(!p)return;['editId','code','type','title','price','area','rooms','floor','phone','description'].forEach(k=>document.getElementById(k).value=p[k]??'');scrollTo({top:0,behavior:'smooth'})}
+function editProperty(id){const p=properties.find(x=>String(x.id)===String(id));if(!p)return;['editId','code','type','title','price','area','rooms','floor','phone','description'].forEach(k=>document.getElementById(k).value=p[k]??'');scrollTo({top:0,behavior:'smooth'});}
 async function saveProperty(){
- const msg=document.getElementById('formMsg');msg.className='';msg.textContent='Պահպանվում է...';
- const id=document.getElementById('editId').value;
- const row={code:v('code'),type:v('type'),title:v('title'),price:num('price'),area:num('area'),rooms:num('rooms'),floor:num('floor'),phone:v('phone'),description:v('description')};
- let result=id?await db.from('properties').update(row).eq('id',id):await db.from('properties').insert(row);
- if(result.error){msg.className='error';msg.textContent=result.error.message;return}
- msg.className='success';msg.textContent='Պահպանվեց';clearForm();await load();
+  const id=document.getElementById('editId').value;
+  const row={code:v('code'),type:v('type'),title:v('title'),price:num('price'),area:num('area'),rooms:num('rooms'),floor:num('floor'),phone:v('phone'),description:v('description')};
+  setMsg('formMsg','Պահպանվում է...');
+  const result=id?await client.from('properties').update(row).eq('id',id):await client.from('properties').insert(row);
+  if(result.error){setMsg('formMsg',result.error.message,'error');return;}
+  setMsg('formMsg','Պահպանվեց։','success');clearForm();await load();
 }
-async function deleteProperty(id){if(!confirm('Ջնջե՞լ այս հայտարարությունը'))return;const {error}=await db.from('properties').delete().eq('id',id);if(error){alert(error.message);return}await load()}
-function clearForm(){['editId','code','title','price','area','rooms','floor','phone','description'].forEach(k=>document.getElementById(k).value='');document.getElementById('type').value='Բնակարան'}
+async function deleteProperty(id){if(!confirm('Ջնջե՞լ այս հայտարարությունը'))return;const {error}=await client.from('properties').delete().eq('id',id);if(error){alert(error.message);return}await load();}
+function clearForm(){['editId','code','title','price','area','rooms','floor','phone','description'].forEach(k=>document.getElementById(k).value='');document.getElementById('type').value='Բնակարան';}
 function v(id){return document.getElementById(id).value.trim()||null}function num(id){const x=document.getElementById(id).value;return x===''?null:Number(x)}
-function escapeHtml(x){return String(x??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-(async()=>{const {data:{session}}=await db.auth.getSession();if(session){showApp();await load()}})();
+function escapeHtml(x){return String(x??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+
+window.addEventListener('DOMContentLoaded',async()=>{
+  if(!window.supabase){setMsg('loginMsg','Supabase գրադարանը չի բեռնվել։','error');return;}
+  try{client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);}catch(e){setMsg('loginMsg',e.message,'error');return;}
+  document.getElementById('loginBtn').addEventListener('click',login);
+  document.getElementById('logoutBtn').addEventListener('click',logout);
+  document.getElementById('saveBtn').addEventListener('click',saveProperty);
+  document.getElementById('clearBtn').addEventListener('click',clearForm);
+  document.getElementById('search').addEventListener('input',render);
+  const {data:{session}}=await client.auth.getSession();
+  if(session){showApp();await load();}
+});
 </script>
 </body>
 </html>
